@@ -36,6 +36,6 @@ There is no model and no feed. Itineraries are built by scoring sample attractio
 - Scripts are classic `<script>` tags (not ES modules) so everything works from `file://`.
 - Tested in Chromium; any modern browser should work.
 
-## Using real photos (optional)
+## Images
 
-The bundled images are SVG illustrations. To use real photos, drop JPGs into `assets/img/photos/` named `paris.jpg`, `tokyo.jpg`, `bali.jpg`, `rome.jpg`, `lisbon.jpg`, `capetown.jpg` (about 1200×700) and optionally `hotel-budget.jpg`, `hotel-mid.jpg`, `hotel-luxury.jpg`. They are picked up automatically; any missing file falls back to the SVG. Use photos you have rights to (e.g. Unsplash or Wikimedia Commons) and keep them in the folder so the demo stays offline.
+`assets/img/photos/*.jpg` holds the destination and hotel photos (AI-generated, supplied by the project owner and cropped to 1200×700; the originals were small, so they are slightly soft at full width). To swap in higher-resolution images, replace the files with the same names: `paris`, `tokyo`, `bali`, `rome`, `lisbon`, `capetown`, `hotel-budget`, `hotel-mid`, `hotel-luxury`. If a JPG is missing, the app falls back to the SVG illustration in `assets/img/`. Everything is bundled locally, so the demo works offline.

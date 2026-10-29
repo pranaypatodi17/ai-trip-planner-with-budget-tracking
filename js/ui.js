@@ -149,14 +149,14 @@
     var t = S.trip, p = t.params, d = E.dest(t), b = E.budget(t), h = E.hotelOf(t);
     var why = A.why(t), tips = A.tips(t);
     var html =
-      '<div class="banner"><img src="assets/img/' + p.dest + '.svg" alt=""><div class="in"><h2>' + esc(t.name) + '</h2>' +
+      '<div class="banner">' + photo(p.dest) + '<div class="in"><h2>' + esc(t.name) + '</h2>' +
       '<div>' + esc(d.name) + ', ' + esc(d.country) + ' · ' + fmtISOLabel(p.start) + ' → ' + fmtISOLabel(E.addDays(p.start, p.days - 1)) + '</div>' +
       '<div class="small" style="margin-top:6px">' + esc(d.tagline) + ' · from ' + esc(D.ORIGINS[p.origin]) + ' · ' + p.travelers + ' traveler' + (p.travelers > 1 ? 's' : '') + '</div>' +
       '<div class="row" style="margin-top:12px"><button class="sm" data-act="remix">🔀 Remix itinerary</button><button class="sm" data-act="optimize">🪄 Auto-fit to budget</button><button class="sm" data-act="goto" data-tab="budget">Budget details →</button></div></div></div>' +
       '<div class="grid g2">' +
       '<div class="card why"><h3>🧠 Why this plan</h3><ul>' + why.map(function (l) { return '<li>' + l + '</li>'; }).join('') + '</ul><div class="small muted">' + tips.join(' ') + '</div></div>' +
       '<div class="card"><h3>🧳 Trip logistics</h3>' +
-      '<div class="row" style="align-items:flex-start;flex-wrap:nowrap"><img src="assets/img/hotel-' + h.tier + '.svg" alt="" width="110" height="75" style="border-radius:10px;object-fit:cover"><div><b>' + esc(h.name) + '</b><div class="small muted">' + esc(h.area) + ' · ★ ' + h.rating + ' · ' + esc(h.perks) + '</div></div></div>' +
+      '<div class="row" style="align-items:flex-start;flex-wrap:nowrap">' + photo('hotel-' + h.tier, 'width="110" height="75" style="border-radius:10px;object-fit:cover"') + '<div><b>' + esc(h.name) + '</b><div class="small muted">' + esc(h.area) + ' · ★ ' + h.rating + ' · ' + esc(h.perks) + '</div></div></div>' +
       '<div class="form-grid" style="margin-top:12px">' +
       field('Hotel', '<select data-chg="hotel">' + options(E.dest(t).hotels.map(function (x) { return [x.id, x.name + ' · ' + money(x.nightly) + '/night']; }), t.hotelId) + '</select>') +
       field('Flights', '<select data-chg="flightClass">' + options(D.FLIGHT_CLASSES.map(function (c) { return [c.id, c.label + ' · ' + money(Math.round(d.flights[p.origin] * c.mult)) + ' pp']; }), t.flightClass) + '</select>') +

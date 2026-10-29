@@ -84,7 +84,7 @@ input[type=checkbox], input[type=radio] { width: auto; }
 .big { font-size: 1.9rem; font-weight: 800; letter-spacing: -.02em; }
 
 .banner { position: relative; border-radius: var(--radius); overflow: hidden; color: #fff; min-height: 150px; margin-bottom: 18px; background: #0f172a; }
-.banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 22%; }
 .banner .in { position: relative; padding: 24px; background: linear-gradient(90deg, rgba(0,0,0,.65), rgba(0,0,0,.05)); min-height: 150px; }
 .banner h2 { font-size: 1.7rem; margin: 0; }
 
