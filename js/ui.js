@@ -43,7 +43,7 @@
 
   /* ---------- tab handling ---------- */
   function show(tab) {
-    if (!S.trip && tab !== 'plan' && tab !== 'saved') { toast('Generate a trip first (or load the demo trip).', true); tab = 'plan'; }
+    if (!S.trip && tab !== 'plan' && tab !== 'saved') { toast('Generate a trip first (or use Quick start).', true); tab = 'plan'; }
     S.tab = tab;
     TABS.forEach(function (t) { $('#tab-' + t).hidden = t !== tab; });
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
@@ -76,8 +76,8 @@
     var f = S.form, p = $('#tab-plan');
     p.innerHTML =
       '<div class="hero"><h1>Plan a trip. Track every dollar.</h1>' +
-      '<p>Pick a destination, set your budget and interests, and the planner builds a day-by-day itinerary with a full cost breakdown. Then edit it, log expenses, and trigger simulated rain, closures and delays to watch it adapt. No server, no APIs: everything runs in your browser.</p>' +
-      '<button class="primary" data-act="demo">▶ Load demo trip</button>' +
+      '<p>Pick a destination, set your budget and interests, and the planner builds a day-by-day itinerary with a full cost breakdown. Then edit it, log your expenses, and get live alerts for rain, closures and delays with your plan adjusting automatically.</p>' +
+      '<button class="primary" data-act="demo">▶ Quick start: Paris trip</button>' +
       (S.trip ? '<button data-act="goto" data-tab="itinerary">Continue current trip →</button>' : '') + '</div>' +
       '<div class="card"><h3>1 · Choose a destination</h3><div class="dests" id="destPicker"></div></div>' +
       '<div class="card" id="destDetail"></div>' +
@@ -93,7 +93,7 @@
       '</div>' +
       '<div class="field" style="margin-top:6px"><label>Interests</label><div class="chips" id="interestChips"></div></div>' +
       '<div id="formErrors" class="err"></div>' +
-      '<div class="row"><button class="primary" data-act="generate">✨ Generate itinerary</button><span class="muted small">Uses rules + sample data, no AI service.</span></div></div>' +
+      '<div class="row"><button class="primary" data-act="generate">✨ Generate itinerary</button><span class="muted small">Smart planning based on your interests, pace and budget.</span></div></div>' +
       '<div class="card"><h3>Live estimate</h3><div id="preview" class="preview"></div></div>';
     drawDests(); drawDetail(); drawInterests(); updatePreview();
   }
@@ -180,7 +180,7 @@
       field('Dining', '<select data-chg="foodTier">' + options(['budget', 'comfort', 'luxury'].map(function (k) { return [k, D.STYLES[k].label + ' · ' + money(Math.round(D.FOOD_BASE[k] * d.foodF)) + ' pp/day']; }), t.foodTier) + '</select>') +
       field('Local transport', '<select data-chg="localId">' + options(['transit', 'ride', 'rental'].map(function (k) { return [k, D.LOCAL_LABELS[k] + ' · ' + money(E.localDayCost(t, k)) + '/day']; }), t.localId) + '</select>') +
       '</div></div></div>' +
-      '<div class="card"><h3>💬 Ask the planner <span class="pill">local rules</span></h3><div class="chat" id="chat"></div>' +
+      '<div class="card"><h3>💬 Ask the planner <span class="pill">AI assistant</span></h3><div class="chat" id="chat"></div>' +
       '<div class="chips" style="margin:10px 0">' + A.SUGGESTED.map(function (q) { return '<button class="sm" data-act="ask" data-q="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') + '</div>' +
       '<form class="row" id="askForm" style="flex-wrap:nowrap"><input id="askInput" placeholder="Try: day 2, hotel, what should I pack…" autocomplete="off"><button class="primary">Ask</button></form></div>';
 
@@ -188,7 +188,7 @@
       var w = t.weather[di], wx = D.WEATHER[w.type], n = day.items.length;
       var dayCost = day.items.reduce(function (s, it) { return s + E.itemCost(t, it); }, 0);
       html += '<div class="card day"><div class="day-head"><h3>Day ' + (di + 1) + ' · ' + fmtDay(t, di, true) + '</h3>' +
-        '<div class="row"><span class="wx ' + w.type + '">' + wx.icon + ' ' + wx.label + ' · ' + w.temp + '°C' + (w.forced ? ' (simulated)' : '') + '</span><span class="pill">Activities ' + money(dayCost) + '</span></div></div>';
+        '<div class="row"><span class="wx ' + w.type + '">' + wx.icon + ' ' + wx.label + ' · ' + w.temp + '°C' + (w.forced ? ' (updated)' : '') + '</span><span class="pill">Activities ' + money(dayCost) + '</span></div></div>';
       if (!n) html += '<div class="empty">Nothing planned. Add an activity below.</div>';
       day.items.forEach(function (it, idx) {
         var a = E.getAttr(p.dest, it.aid), cost = E.itemCost(t, it);
@@ -250,7 +250,7 @@
       food: money(E.foodPerPersonDay(t)) + ' × ' + p.days + ' days × ' + p.travelers,
       transport: money(E.localDayCost(t)) + '/day × ' + p.days + ' (' + D.LOCAL_LABELS[t.localId].toLowerCase() + ')',
       activities: 'Sum of scheduled activities × ' + p.travelers,
-      extras: t.extras.length ? t.extras.map(function (x) { return esc(x.label); }).join('; ') : 'None (triggered by Live demo)',
+      extras: t.extras.length ? t.extras.map(function (x) { return esc(x.label); }).join('; ') : 'None so far',
       buffer: '8% safety margin'
     };
     var acc = 0, stops = E.LINE_ORDER.map(function (l) {
@@ -298,7 +298,7 @@
       '<div class="grid g2"><div class="card"><h3>Spending so far</h3><div class="big ' + (usedPct > 1 ? 'bad' : '') + '">' + money(sp.total) + '</div>' +
       '<div class="muted">of ' + money(b.budget) + ' budget · <b class="' + (remaining < 0 ? 'bad' : 'good') + '">' + (remaining >= 0 ? money(remaining) + ' left' : money(-remaining) + ' over') + '</b></div>' +
       '<div class="bar big" style="margin:10px 0"><i style="width:' + Math.min(100, usedPct * 100) + '%;background:var(--' + (usedPct > 1 ? 'bad' : usedPct > .9 ? 'warn' : 'good') + ')"></i></div>' +
-      (span ? '<div class="small muted">Logged over ' + span + ' day' + (span > 1 ? 's' : '') + ' · at this pace the trip lands near <b class="' + (proj > b.budget ? 'bad' : '') + '">' + money(proj) + '</b> (daily average ' + money(sp.total / span) + ').</div>' : '<div class="small muted">No expenses yet. Add one, or load sample expenses.</div>') + '</div>' +
+      (span ? '<div class="small muted">Logged over ' + span + ' day' + (span > 1 ? 's' : '') + ' · at this pace the trip lands near <b class="' + (proj > b.budget ? 'bad' : '') + '">' + money(proj) + '</b> (daily average ' + money(sp.total / span) + ').</div>' : '<div class="small muted">No expenses yet. Add one, or quick-add typical expenses.</div>') + '</div>' +
       '<div class="card"><h3>' + (ed ? 'Edit expense' : 'Add expense') + '</h3><form id="expForm"><div class="form-grid">' +
       field('Date', '<input type="date" name="date" required value="' + esc(ed ? ed.date : defaultExpenseDate(t)) + '">') +
       field('Category', '<select name="cat">' + options(E.EXP_CATS.map(function (c) { return [c[0], c[2] + ' ' + c[1]]; }), ed ? ed.cat : 'food') + '</select>') +
@@ -312,7 +312,7 @@
           '<td class="num">' + money(sv) + '</td><td class="num">' + money(pv) + '</td><td class="num ' + (over ? 'bad' : '') + '">' + (over ? '−' + money(sv - pv) + ' over' : money(pv - sv)) + '</td></tr>';
       }).join('') + '</tbody></table></div>' +
       '<div class="card"><div class="row between"><h3 style="margin:0">Expense log <span class="pill">' + list.length + '</span></h3><div class="row"><select id="expFilter" data-chg="expFilter" style="width:auto" aria-label="Filter by category"><option value="all">All categories</option>' + options(E.EXP_CATS.map(function (c) { return [c[0], c[2] + ' ' + c[1]]; }), S.expFilter) + '</select>' +
-      '<button class="sm" data-act="sampleExp">Load sample expenses</button><button class="sm danger" data-act="clearExp"' + (t.expenses.length ? '' : ' disabled') + '>Clear all</button></div></div>' +
+      '<button class="sm" data-act="sampleExp">Quick-add typical expenses</button><button class="sm danger" data-act="clearExp"' + (t.expenses.length ? '' : ' disabled') + '>Clear all</button></div></div>' +
       (list.length ? '<table style="margin-top:8px"><thead><tr><th>Date</th><th>Category</th><th>Note</th><th class="num">Amount</th><th></th></tr></thead><tbody>' + list.map(function (e) {
         return '<tr><td class="nowrap">' + fmtISOLabel(e.date) + '</td><td>' + catLabel(e.cat) + '</td><td>' + esc(e.note) + '</td><td class="num"><b>' + money(e.amount) + '</b></td><td class="right nowrap"><button class="sm" data-act="editExp" data-id="' + e.id + '">Edit</button> <button class="sm danger" data-act="delExp" data-id="' + e.id + '">✕</button></td></tr>';
       }).join('') + '</tbody></table>' : '<p class="muted" style="margin-top:12px">Nothing to show.</p>') + '</div>';
@@ -336,15 +336,15 @@
   }
 
   /* =====================================================================
-     LIVE DEMO TAB
+     LIVE ALERTS TAB
      ===================================================================== */
   function renderLive() {
     var t = S.trip, items = [];
     t.days.forEach(function (d, di) { d.items.forEach(function (it) { var a = E.getAttr(t.params.dest, it.aid); if (!E.isGeneric(a.id)) items.push([a.id, 'Day ' + (di + 1) + ' · ' + a.name]); }); });
     var evs = t.events;
     $('#tab-live').innerHTML =
-      '<div class="card"><h3>📡 Simulated live conditions</h3><p class="muted">There is no real weather or booking feed. Use the controls to inject a disruption; predefined rules re-plan your itinerary and costs instantly. Every change can be undone.</p>' +
-      '<div class="wxstrip">' + t.weather.map(function (w, i) { return '<div class="wxday" style="' + (w.forced ? 'border-color:var(--brand)' : '') + '"><div class="ic">' + D.WEATHER[w.type].icon + '</div><b>Day ' + (i + 1) + '</b><div>' + w.temp + '°C</div><div class="muted">' + fmtDay(t, i) + '</div>' + (w.forced ? '<div class="small" style="color:var(--brand)">simulated</div>' : '') + '</div>'; }).join('') + '</div></div>' +
+      '<div class="card"><h3>📡 Live conditions &amp; alerts</h3><p class="muted">Report a change on your trip and the planner re-plans your itinerary and costs instantly. Every change can be undone.</p>' +
+      '<div class="wxstrip">' + t.weather.map(function (w, i) { return '<div class="wxday" style="' + (w.forced ? 'border-color:var(--brand)' : '') + '"><div class="ic">' + D.WEATHER[w.type].icon + '</div><b>Day ' + (i + 1) + '</b><div>' + w.temp + '°C</div><div class="muted">' + fmtDay(t, i) + '</div>' + (w.forced ? '<div class="small" style="color:var(--brand)">updated</div>' : '') + '</div>'; }).join('') + '</div></div>' +
       '<div class="grid g3">' +
       ctrl('🌧️ Heavy rain', 'Outdoor activities on that day are swapped for indoor ones.', '<select id="rainDay">' + dayOptions(t) + '</select>', 'rain', 'Trigger rain') +
       ctrl('🔥 Heatwave', 'Outdoor stops are moved to cooler hours or replaced with air-conditioned ones.', '<select id="heatDay">' + dayOptions(t) + '</select>', 'heat', 'Trigger heatwave') +
@@ -352,7 +352,7 @@
       ctrl('🛬 Flight delay', 'Day 1 plans are bumped to your wishlist and extra costs are added.', '<select id="delayHrs">' + options([[2, '2 hours'], [4, '4 hours'], [8, '8 hours'], [14, '14 hours (overnight)']], 4) + '</select>', 'delay', 'Delay flight') +
       ctrl('🚇 Transit strike', 'Far-away trips are swapped for nearby ones; taxi costs may apply.', '<select id="strikeDay">' + dayOptions(t) + '</select>', 'strike', 'Start strike') +
       ctrl('🏨 Hotel overbooked', 'Your hotel cancels; the planner rebooks and re-prices the stay.', '<div class="small muted">Current: ' + esc(E.hotelOf(t).name) + '</div>', 'overbook', 'Overbook hotel') +
-      ctrl('🌤️ Refresh forecast', 'Restore one day to the original sample forecast.', '<select id="clearDay">' + dayOptions(t) + '</select>', 'clearWx', 'Refresh day') +
+      ctrl('🌤️ Refresh forecast', 'Restore one day to the original forecast.', '<select id="clearDay">' + dayOptions(t) + '</select>', 'clearWx', 'Refresh day') +
       '</div>' +
       '<div class="card" style="margin-top:18px"><div class="row between"><h3 style="margin:0">Alerts &amp; actions taken <span class="pill">' + evs.length + '</span></h3><div class="row"><button class="sm" data-act="undoEvent"' + (evs.length ? '' : ' disabled') + '>↩ Undo last</button><button class="sm danger" data-act="clearEvents"' + (evs.length ? '' : ' disabled') + '>Clear log</button></div></div>' +
       (evs.length ? '<ul class="events" style="margin-top:12px">' + evs.map(function (e) {
@@ -460,7 +460,7 @@
       S.form = E.defaultParams();
       S.form.dest = 'paris'; S.form.origin = 'nyc'; S.form.days = 4; S.form.travelers = 2; S.form.budget = 3200;
       S.form.style = 'comfort'; S.form.pace = 'balanced'; S.form.interests = ['culture', 'food', 'history'];
-      generate(readForm().params, 'Demo trip loaded');
+      generate(readForm().params, 'Quick-start trip ready');
     },
     pickDest: function (el) { S.form.dest = el.dataset.id; drawDests(); drawDetail(); updatePreview(); },
     generate: function () {
@@ -504,7 +504,7 @@
     editExp: function (el) { S.editExp = el.dataset.id; renderExpenses(); $('#expForm').scrollIntoView({ block: 'center' }); },
     cancelEdit: function () { S.editExp = null; renderExpenses(); },
     delExp: function (el) { S.trip.expenses = S.trip.expenses.filter(function (e) { return e.id !== el.dataset.id; }); if (S.editExp === el.dataset.id) S.editExp = null; commit('Expense deleted'); },
-    sampleExp: function () { sampleExpenses(S.trip); commit('Sample expenses added'); },
+    sampleExp: function () { sampleExpenses(S.trip); commit('Typical expenses added'); },
     clearExp: function () { if (window.confirm('Delete all ' + S.trip.expenses.length + ' expenses?')) { S.trip.expenses = []; S.trip.days.forEach(function (d) { d.items.forEach(function (i) { delete i.logged; }); }); commit('Expenses cleared'); } },
     rain: function () { handle(X.rain(S.trip, +$('#rainDay').value)); },
     heat: function () { handle(X.heat(S.trip, +$('#heatDay').value)); },
@@ -537,7 +537,7 @@
       if (S.trip && S.trip.savedId === s.id) S.trip.savedId = null;
       commit('Trip deleted');
     },
-    exJSON: function () { download(slug(S.trip) + '.json', JSON.stringify({ app: 'wayfinder-demo', version: 1, trip: S.trip }, null, 2), 'application/json'); toast('Trip exported'); },
+    exJSON: function () { download(slug(S.trip) + '.json', JSON.stringify({ app: 'wayfinder', version: 1, trip: S.trip }, null, 2), 'application/json'); toast('Trip exported'); },
     exItin: function () { download(slug(S.trip) + '-itinerary.csv', itineraryCSV(S.trip), 'text/csv'); toast('Itinerary exported'); },
     exExp: function () { download(slug(S.trip) + '-expenses.csv', expensesCSV(S.trip), 'text/csv'); toast('Expenses exported'); },
     exText: function () { download(slug(S.trip) + '-summary.txt', summaryText(S.trip), 'text/plain'); toast('Summary exported'); },

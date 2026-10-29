@@ -109,7 +109,7 @@
       var ws = weatherSummary(trip);
       var r = '<b>Forecast</b><br>' + ws.parts.join('<br>');
       if (ws.best >= 0) r += '<br><br>Best day for outdoor highlights: <b>Day ' + (ws.best + 1) + '</b>.';
-      r += '<br>If it rains, use <i>Live demo → Heavy rain</i> and I will swap outdoor stops for indoor ones.';
+      r += '<br>If it rains, report heavy rain under <i>Live alerts</i> and I will swap outdoor stops for indoor ones.';
       return r;
     }
     if (/hotel|stay|sleep|room|lodg|accommodation/.test(s)) {
@@ -126,7 +126,7 @@
       return '<b>Top-rated stops in your plan:</b><ul>' + top.map(function (x) { return '<li>' + esc(x.a.name) + ' — ★ ' + x.a.rating + ' (day ' + (x.di + 1) + ')</li>'; }).join('') + '</ul>';
     }
     if (/hello|hi\b|hey|help|what can/.test(s)) return 'Hi! Ask me about your <b>budget</b>, <b>packing</b>, <b>weather</b>, <b>savings</b>, <b>hotel</b>, <b>food</b>, or a specific day (e.g. “day 2”).';
-    return 'I can answer questions about your budget, packing, weather, savings, hotel, food, highlights, or a specific day (try “day 2”). Everything runs locally from the sample data.';
+    return 'I can answer questions about your budget, packing, weather, savings, hotel, food, highlights, or a specific day (try “day 2”).';
   }
 
   window.Assistant = { why: why, packing: packing, tips: tips, answer: answer, SUGGESTED: SUGGESTED, weatherSummary: weatherSummary };
