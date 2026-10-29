@@ -80,6 +80,7 @@
       '<button class="primary" data-act="demo">▶ Load demo trip</button>' +
       (S.trip ? '<button data-act="goto" data-tab="itinerary">Continue current trip →</button>' : '') + '</div>' +
       '<div class="card"><h3>1 · Choose a destination</h3><div class="dests" id="destPicker"></div></div>' +
+      '<div class="card" id="destDetail"></div>' +
       '<div class="card"><h3>2 · Trip details</h3><div class="form-grid">' +
       field('Departing from', '<select data-inp="form" name="origin">' + options(Object.keys(D.ORIGINS).map(function (k) { return [k, D.ORIGINS[k]]; }), f.origin) + '</select>') +
       field('Start date', '<input type="date" data-inp="form" name="start" value="' + esc(f.start) + '">') +
@@ -94,7 +95,7 @@
       '<div id="formErrors" class="err"></div>' +
       '<div class="row"><button class="primary" data-act="generate">✨ Generate itinerary</button><span class="muted small">Uses rules + sample data, no AI service.</span></div></div>' +
       '<div class="card"><h3>Live estimate</h3><div id="preview" class="preview"></div></div>';
-    drawDests(); drawInterests(); updatePreview();
+    drawDests(); drawDetail(); drawInterests(); updatePreview();
   }
   function field(label, html) { return '<div class="field"><label>' + label + '</label>' + html + '</div>'; }
   function drawDests() {
@@ -103,6 +104,22 @@
       return '<button type="button" class="dest' + (S.form.dest === id ? ' sel' : '') + '" data-act="pickDest" data-id="' + id + '" aria-pressed="' + (S.form.dest === id) + '">' +
         photo(id) + '<span><b>' + d.name + ', ' + d.country + '</b>' + esc(d.tagline) + '</span></button>';
     }).join('');
+  }
+  function drawDetail() {
+    var el = $('#destDetail'); if (!el) return;
+    var d = D.DESTS[S.form.dest], o = S.form.origin, hs = d.hotels.slice().sort(function (a, b) { return a.nightly - b.nightly; });
+    var top = d.attractions.slice().sort(function (a, b) { return b.rating - a.rating; }).slice(0, 5);
+    var c = d.climate, climate = c.hem === 0 ? 'Tropical, warm all year (about ' + c.mean + '°C)' : 'Yearly average about ' + c.mean + '°C, ' + (c.rain >= .3 ? 'fairly rainy' : c.rain >= .2 ? 'occasional rain' : 'mostly dry');
+    var style = S.form.style, food = Math.round(D.FOOD_BASE[style] * d.foodF);
+    el.innerHTML =
+      '<div class="row" style="align-items:flex-start;flex-wrap:nowrap">' + photo(d.id, 'width="260" height="150" style="border-radius:12px;object-fit:cover;flex:none;max-width:40%"') +
+      '<div><h3 style="margin-bottom:2px">' + esc(d.name) + ', ' + esc(d.country) + '</h3><div class="muted">' + esc(d.tagline) + '</div>' +
+      '<div class="chips" style="margin-top:8px"><span class="pill">Best for: ' + esc(d.best) + '</span><span class="pill">' + esc(climate) + '</span></div>' +
+      '<div class="small muted" style="margin-top:8px">Typical costs (' + D.STYLES[style].label.toLowerCase() + ' style): ' + money(food) + ' food/day pp · hotels ' + money(hs[0].nightly) + '–' + money(hs[hs.length - 1].nightly) + '/night · transit ' + money(Math.round(D.LOCAL_BASE.transit * d.localF.transit)) + '/day pp</div></div></div>' +
+      '<div class="grid g3" style="margin-top:14px">' +
+      '<div><h4>✈️ Flights from ' + esc(D.ORIGINS[o]) + '</h4>' + D.FLIGHT_CLASSES.map(function (f) { return '<div class="small"><span class="muted">' + f.label + '</span> <b>' + money(Math.round(d.flights[o] * f.mult)) + '</b> pp</div>'; }).join('') + '</div>' +
+      '<div><h4>⭐ Top attractions</h4>' + top.map(function (a) { return '<div class="small">' + D.CATS[a.cat].icon + ' ' + esc(a.name) + ' <span class="muted">· ' + (a.cost ? money(a.cost) : 'free') + '</span></div>'; }).join('') + '</div>' +
+      '<div><h4>🏨 Hotels</h4>' + hs.map(function (h) { return '<div class="small">' + esc(h.name) + ' <span class="muted">· ' + h.tier + ' · ' + money(h.nightly) + '/night · ★ ' + h.rating + '</span></div>'; }).join('') + '</div></div>';
   }
   function drawInterests() {
     $('#interestChips').innerHTML = Object.keys(D.CATS).map(function (k) {
@@ -445,7 +462,7 @@
       S.form.style = 'comfort'; S.form.pace = 'balanced'; S.form.interests = ['culture', 'food', 'history'];
       generate(readForm().params, 'Demo trip loaded');
     },
-    pickDest: function (el) { S.form.dest = el.dataset.id; drawDests(); updatePreview(); },
+    pickDest: function (el) { S.form.dest = el.dataset.id; drawDests(); drawDetail(); updatePreview(); },
     generate: function () {
       var r = readForm();
       if (r.errors.length) { $('#formErrors').textContent = r.errors.join(' '); toast('Please fix the form', true); return; }
@@ -586,7 +603,7 @@
   });
   document.addEventListener('input', function (e) {
     var el = e.target.closest('[data-inp="form"]');
-    if (el) { S.form[el.name] = el.value; updatePreview(); }
+    if (el) { S.form[el.name] = el.value; if (el.name === 'origin' || el.name === 'style') drawDetail(); updatePreview(); }
   });
   document.addEventListener('submit', function (e) {
     e.preventDefault();
