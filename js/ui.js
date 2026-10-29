@@ -29,6 +29,10 @@
     var set = D.TIME_SETS[Math.min(n, 6)];
     return set[Math.min(idx, set.length - 1)];
   }
+  /* Prefers a real photo at assets/img/photos/<name>.jpg when present, else the bundled SVG illustration. */
+  function photo(name, attrs) {
+    return '<img src="assets/img/photos/' + name + '.jpg" onerror="this.onerror=null;this.src=\'assets/img/' + name + '.svg\'" alt="" ' + (attrs || '') + '>';
+  }
   function statusLabel(st) { return st === 'good' ? 'On track' : st === 'warn' ? 'Tight' : 'Over budget'; }
   function statusClass(st) { return st === 'good' ? 'good' : st === 'warn' ? 'warn' : 'bad'; }
   function catTag(cat) { var c = D.CATS[cat]; return '<span class="tag" style="background:' + c.color + '">' + c.icon + ' ' + c.label + '</span>'; }
@@ -97,7 +101,7 @@
     $('#destPicker').innerHTML = Object.keys(D.DESTS).map(function (id) {
       var d = D.DESTS[id];
       return '<button type="button" class="dest' + (S.form.dest === id ? ' sel' : '') + '" data-act="pickDest" data-id="' + id + '" aria-pressed="' + (S.form.dest === id) + '">' +
-        '<img src="assets/img/' + id + '.svg" alt=""><span><b>' + d.name + ', ' + d.country + '</b>' + esc(d.tagline) + '</span></button>';
+        photo(id) + '<span><b>' + d.name + ', ' + d.country + '</b>' + esc(d.tagline) + '</span></button>';
     }).join('');
   }
   function drawInterests() {

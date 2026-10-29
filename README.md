@@ -35,3 +35,7 @@ There is no model and no feed. Itineraries are built by scoring sample attractio
 - Data is stored in your browser's localStorage. If it is blocked (some private modes), the app keeps data in memory for the session and says so on the Saved tab.
 - Scripts are classic `<script>` tags (not ES modules) so everything works from `file://`.
 - Tested in Chromium; any modern browser should work.
+
+## Using real photos (optional)
+
+The bundled images are SVG illustrations. To use real photos, drop JPGs into `assets/img/photos/` named `paris.jpg`, `tokyo.jpg`, `bali.jpg`, `rome.jpg`, `lisbon.jpg`, `capetown.jpg` (about 1200×700) and optionally `hotel-budget.jpg`, `hotel-mid.jpg`, `hotel-luxury.jpg`. They are picked up automatically; any missing file falls back to the SVG. Use photos you have rights to (e.g. Unsplash or Wikimedia Commons) and keep them in the folder so the demo stays offline.
