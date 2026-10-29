@@ -311,37 +311,47 @@
   function renderBudget() {
     var t = S.trip, b = E.budget(t), L = b.lines, p = t.params, h = E.hotelOf(t), sg = E.suggestions(t);
     var detail = {
-      flights: money(E.flightPerPerson(t)) + ' × ' + p.travelers + ' traveler' + (p.travelers > 1 ? 's' : '') + ' (' + E.flightClassOf(t).label + ')',
-      lodging: money(h.nightly) + ' × ' + E.nights(t) + ' nights × ' + E.rooms(t) + ' room' + (E.rooms(t) > 1 ? 's' : ''),
-      food: money(E.foodPerPersonDay(t)) + ' × ' + p.days + ' days × ' + p.travelers,
-      transport: money(E.localDayCost(t)) + '/day × ' + p.days + ' (' + D.LOCAL_LABELS[t.localId].toLowerCase() + ')',
-      activities: 'Sum of scheduled activities × ' + p.travelers,
-      extras: t.extras.length ? t.extras.map(function (x) { return esc(x.label); }).join('; ') : 'None so far',
+      flights: p.travelers + ' × ' + money(E.flightPerPerson(t)) + ' · ' + E.flightClassOf(t).label,
+      lodging: E.nights(t) + ' nights · ' + E.rooms(t) + ' room' + (E.rooms(t) > 1 ? 's' : '') + ' · ' + money(h.nightly) + '/night',
+      food: money(E.foodPerPersonDay(t)) + ' pp/day · ' + p.days + ' days',
+      transport: money(E.localDayCost(t)) + '/day · ' + D.LOCAL_LABELS[t.localId].toLowerCase(),
+      activities: p.travelers + ' traveler' + (p.travelers > 1 ? 's' : '') + ' · ' + t.days.reduce(function (n, d) { return n + d.items.length; }, 0) + ' stops',
+      extras: t.extras.length ? t.extras.length + ' alert cost' + (t.extras.length > 1 ? 's' : '') : 'None so far',
       buffer: '8% safety margin'
     };
-    var acc = 0, stops = E.LINE_ORDER.map(function (l) {
-      var share = b.total ? L[l[0]] / b.total * 100 : 0, s = acc; acc += share;
-      return l[3] + ' ' + s + '% ' + acc + '%';
-    }).join(', ');
+    var circ = 2 * Math.PI * 70, used = Math.min(1, b.pct), col = 'var(--' + statusClass(b.status) + ')';
     var saves = sg.filter(function (s) { return s.kind === 'save'; }), ups = sg.filter(function (s) { return s.kind === 'upgrade'; });
-    function suggRow(s) {
-      return '<div class="sugg"><div><b>' + esc(s.title) + '</b><span class="small muted">' + esc(s.desc) + '</span></div><div class="row nowrap"><b class="' + (s.delta < 0 ? 'good' : 'warn') + '">' + (s.delta < 0 ? '−' : '+') + money(Math.abs(s.delta)) + '</b><button class="sm" data-act="applySugg" data-id="' + s.id + '">Apply</button></div></div>';
+    function sugg(s) {
+      return '<div class="scard"><div><b>' + esc(s.title) + '</b><span>' + esc(s.desc) + '</span></div>' +
+        '<div class="sact"><em class="' + (s.delta < 0 ? 'good' : 'warn') + '">' + (s.delta < 0 ? 'Save ' : '+') + money(Math.abs(s.delta)) + '</em><button class="sm" data-act="applySugg" data-id="' + s.id + '">Apply</button></div></div>';
     }
+    var banner = b.status === 'over'
+      ? '<div class="alert bad"><div><b>' + money(-b.remaining) + ' over budget</b><span>Auto-fit finds the least painful cuts.</span></div><button class="primary" data-act="optimize">🪄 Auto-fit to budget</button></div>'
+      : '<div class="alert ' + (b.status === 'warn' ? 'warn' : 'good') + '"><div><b>' + (b.status === 'warn' ? 'Tight, but it fits' : 'You are on track') + '</b><span>' + money(b.remaining) + ' to spare.</span></div></div>';
     $('#tab-budget').innerHTML =
-      '<div class="card"><div class="row between" style="align-items:flex-start"><div><div class="muted">Planned total</div><div class="big ' + statusClass(b.status) + '" data-count="' + b.total + '">' + money(b.total) + '</div>' +
-      '<span class="pill ' + statusClass(b.status) + '">' + statusLabel(b.status) + '</span> <span class="muted">' + (b.remaining >= 0 ? money(b.remaining) + ' under budget' : money(-b.remaining) + ' over budget') + '</span></div>' +
-      '<div style="min-width:200px"><label for="budgetInput">Your budget (USD)</label><input id="budgetInput" type="number" min="100" step="50" value="' + p.budget + '" data-chg="budget"></div></div>' +
-      '<div class="bar big" style="margin:14px 0 6px"><i style="width:' + Math.min(100, b.pct * 100) + '%;background:var(--' + statusClass(b.status) + ')"></i></div>' +
-      '<div class="row between small muted"><span>' + Math.round(b.pct * 100) + '% of budget</span><span>' + money(b.perPerson) + ' per person · ' + money(b.perDay) + ' per day</span></div>' +
-      (b.status === 'over' ? '<div class="row" style="margin-top:12px"><button class="primary" data-act="optimize">🪄 Auto-fit to budget</button><span class="small muted">Applies the least painful cuts first.</span></div>' : '') + '</div>' +
-      '<div class="grid g2"><div class="card"><h3>Breakdown</h3><div class="row" style="flex-wrap:nowrap;align-items:center"><div class="donut" style="background:conic-gradient(' + stops + ')"><div class="donut-c"><div>' + money(b.total) + '<div class="small muted" style="font-weight:500">total</div></div></div></div>' +
-      '<div class="small stack">' + E.LINE_ORDER.map(function (l) { return L[l[0]] > 0 ? '<div><span class="dot" style="background:' + l[3] + '"></span>' + l[1] + ' <b>' + Math.round(L[l[0]] / b.total * 100) + '%</b></div>' : ''; }).join('') + '</div></div></div>' +
-      '<div class="card"><h3>How it is calculated</h3><table><tbody>' + E.LINE_ORDER.map(function (l) {
-        return '<tr><td>' + l[2] + ' ' + l[1] + '<div class="small muted">' + detail[l[0]] + '</div></td><td class="num"><b>' + money(L[l[0]]) + '</b></td></tr>';
-      }).join('') + '<tr><td><b>Total</b></td><td class="num"><b>' + money(b.total) + '</b></td></tr></tbody></table></div></div>' +
-      '<div class="grid g2"><div class="card"><h3>💡 Ways to save</h3>' + (saves.length ? saves.map(suggRow).join('') : '<p class="muted">Already at the lowest-cost options available.</p>') + '</div>' +
-      '<div class="card"><h3>✨ Upgrades you can afford</h3>' + (ups.length ? ups.map(suggRow).join('') : '<p class="muted">' + (b.remaining <= 0 ? 'No spare budget for upgrades.' : 'No upgrade fits in your remaining ' + money(b.remaining) + '.') + '</p>') + '</div></div>';
+      '<div class="page-head"><div><span class="eyebrow dark">Budget</span><h2>' + esc(t.name) + '</h2></div><span class="pill">' + fmtISOLabel(p.start) + ' · ' + p.days + ' days · ' + p.travelers + ' guest' + (p.travelers > 1 ? 's' : '') + '</span></div>' +
+      banner +
+      '<div class="kpis">' +
+      kpi('Planned total', '<span class="kv ' + statusClass(b.status) + '" data-count="' + b.total + '">' + money(b.total) + '</span>', 'of your budget: ' + Math.round(b.pct * 100) + '%') +
+      kpi('Your budget', '<span class="kv"><span class="cur">$</span><input id="budgetInput" type="number" min="100" step="50" value="' + p.budget + '" data-chg="budget" aria-label="Budget in USD"></span>', 'tap to edit') +
+      kpi(b.remaining >= 0 ? 'Remaining' : 'Over by', '<span class="kv ' + (b.remaining >= 0 ? 'good' : 'bad') + '">' + money(Math.abs(b.remaining)) + '</span>', b.remaining >= 0 ? 'still available' : 'needs trimming') +
+      kpi('Per person', '<span class="kv">' + money(b.perPerson) + '</span>', money(b.perDay) + ' per day') + '</div>' +
+      '<div class="grid g2b"><div class="card gauge-card"><h3>Budget used</h3>' +
+      '<div class="ring"><svg viewBox="0 0 180 180" aria-hidden="true"><circle cx="90" cy="90" r="70" fill="none" stroke="#eef0f5" stroke-width="16"/>' +
+      '<circle class="arc" cx="90" cy="90" r="70" fill="none" stroke="' + col + '" stroke-width="16" stroke-linecap="round" stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' + (circ * (1 - used)).toFixed(1) + '" style="--circ:' + circ.toFixed(1) + '" transform="rotate(-90 90 90)"/></svg>' +
+      '<div class="ring-c"><b class="' + statusClass(b.status) + '">' + Math.round(b.pct * 100) + '%</b><span>' + statusLabel(b.status) + '</span></div></div></div>' +
+      '<div class="card"><h3>Where the money goes</h3><div class="stack-bar">' + E.LINE_ORDER.filter(function (l) { return L[l[0]] > 0; }).map(function (l) { return '<i style="width:' + (L[l[0]] / b.total * 100) + '%;background:' + l[3] + '" title="' + l[1] + ' ' + money(L[l[0]]) + '"></i>'; }).join('') + '</div>' +
+      '<div class="legend">' + E.LINE_ORDER.filter(function (l) { return L[l[0]] > 0; }).map(function (l) { return '<span><i style="background:' + l[3] + '"></i>' + l[1].replace(' (8%)', '') + ' <b>' + Math.round(L[l[0]] / b.total * 100) + '%</b></span>'; }).join('') + '</div></div></div>' +
+      '<div class="sec-head" style="margin-top:6px"><h3>Breakdown</h3></div>' +
+      '<div class="tiles">' + E.LINE_ORDER.map(function (l) {
+        var v = L[l[0]], share = b.total ? v / b.total * 100 : 0;
+        return '<div class="tile"><div class="tic" style="background:' + l[3] + '1f;color:' + l[3] + '">' + l[2] + '</div><div class="tbody"><span class="tl">' + l[1] + '</span><b>' + money(v) + '</b><small>' + detail[l[0]] + '</small>' +
+          '<div class="bar"><i style="width:' + share + '%;background:' + l[3] + '"></i></div></div><em>' + Math.round(share) + '%</em></div>';
+      }).join('') + '</div>' +
+      '<div class="grid g2b" style="margin-top:18px"><div class="card"><h3>💡 Ways to save</h3>' + (saves.length ? saves.map(sugg).join('') : '<div class="empty">You already have the lowest-cost options.</div>') + '</div>' +
+      '<div class="card"><h3>✨ Worth the upgrade</h3>' + (ups.length ? ups.map(sugg).join('') : '<div class="empty">' + (b.remaining <= 0 ? 'No spare budget for upgrades.' : 'Nothing fits in your remaining ' + money(b.remaining) + '.') + '</div>') + '</div></div>';
   }
+  function kpi(label, value, sub) { return '<div class="kpi"><span class="kl">' + label + '</span>' + value + '<small>' + sub + '</small></div>'; }
 
   /* =====================================================================
      EXPENSES TAB
@@ -470,22 +480,37 @@
   function slug(t) { return t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'trip'; }
 
   function renderSaved() {
-    var t = S.trip;
+    var t = S.trip, persistent = Store.isPersistent();
+    function chip(icon, text) { return '<span class="pill">' + icon + ' ' + text + '</span>'; }
+    var cur = '';
+    if (t) {
+      var b = E.budget(t);
+      cur = '<div class="card curtrip">' + photo(t.params.dest, 'class="cimg"') +
+        '<div class="cbody"><span class="eyebrow dark">Current trip</span>' +
+        '<form id="saveForm" class="row" style="flex-wrap:nowrap;margin:6px 0 10px"><input name="name" value="' + esc(t.name) + '" maxlength="60" aria-label="Trip name" class="nameinput"><button class="primary nowrap">' + (t.savedId ? 'Update' : 'Save trip') + '</button>' + (t.savedId ? '<button type="button" class="nowrap" data-act="saveCopy">Save as copy</button>' : '') + '</form>' +
+        '<div class="chips">' + chip('📅', fmtISOLabel(t.params.start)) + chip('🗓', t.params.days + ' days') + chip('👥', t.params.travelers) + chip('💰', money(b.total) + ' of ' + money(b.budget)) + (t.savedId ? '<span class="pill good">✔ Saved</span>' : '<span class="pill warn">Not saved yet</span>') + '</div></div></div>';
+    }
+    var grid = S.saved.length ? '<div class="tgrid">' + S.saved.map(function (s) {
+      var b = E.budget(s), d = E.dest(s), open = t && t.savedId === s.id;
+      return '<div class="tcard' + (open ? ' open' : '') + '"><div class="timg">' + photo(s.params.dest) + '<span class="tdest">' + esc(d.name) + '</span>' + (open ? '<span class="topen">Open</span>' : '') + '</div>' +
+        '<div class="tbody2"><b>' + esc(s.name) + '</b><small>' + fmtISOLabel(s.params.start) + ' · ' + s.params.days + ' days · ' + s.params.travelers + ' guest' + (s.params.travelers > 1 ? 's' : '') + '</small>' +
+        '<div class="bar"><i style="width:' + Math.min(100, b.pct * 100) + '%;background:var(--' + statusClass(b.status) + ')"></i></div>' +
+        '<div class="row between small"><span>' + money(b.total) + ' <span class="muted">of ' + money(b.budget) + '</span></span><span class="muted">' + s.expenses.length + ' expense' + (s.expenses.length === 1 ? '' : 's') + '</span></div>' +
+        '<div class="tacts"><button class="sm primary" data-act="openSaved" data-id="' + s.id + '">Open</button><button class="sm" data-act="dupSaved" data-id="' + s.id + '" title="Duplicate">⧉</button><button class="sm" data-act="renSaved" data-id="' + s.id + '" title="Rename">✎</button><button class="sm danger" data-act="delSaved" data-id="' + s.id + '" title="Delete">🗑</button></div></div></div>';
+    }).join('') + '</div>' : '<div class="card emptystate"><div class="eicon">🧳</div><h3>No saved trips yet</h3><p class="muted">Save a trip to keep it for later.</p><button class="primary" data-act="goto" data-tab="plan">Plan a trip</button></div>';
+    function xt(icon, title, sub, act, dis) { return '<button class="xtile" data-act="' + act + '"' + (dis ? ' disabled' : '') + '><span class="xi">' + icon + '</span><b>' + title + '</b><small>' + sub + '</small></button>'; }
+    var ex = t ? '<div class="xtiles">' +
+      xt('📦', 'Full trip', '.json · re-importable', 'exJSON') + xt('🗓', 'Itinerary', '.csv · spreadsheet', 'exItin') +
+      xt('💳', 'Expenses', '.csv · spreadsheet', 'exExp', !t.expenses.length) + xt('📝', 'Summary', '.txt · easy to share', 'exText') + xt('🖨', 'Print / PDF', 'itinerary &amp; budget', 'print') + '</div>' +
+      '<details class="share"><summary>Preview &amp; copy text summary</summary><textarea id="summaryBox" rows="10" readonly>' + esc(summaryText(t)) + '</textarea><button class="sm" data-act="copyText">Copy to clipboard</button></details>'
+      : '<p class="muted">Generate a trip to export it.</p>';
     $('#tab-saved').innerHTML =
-      '<div class="card"><h3>💾 Saved trips</h3>' +
-      '<p class="small ' + (Store.isPersistent() ? 'good' : 'warn') + '">' + (Store.isPersistent() ? '✔ Trips are saved in this browser.' : '⚠ localStorage is unavailable here, so trips are kept in memory for this session only. Use Export to keep a copy.') + '</p>' +
-      (t ? '<form class="row" id="saveForm" style="flex-wrap:nowrap"><input name="name" value="' + esc(t.name) + '" maxlength="60" aria-label="Trip name"><button class="primary nowrap">' + (t.savedId ? 'Update saved trip' : 'Save trip') + '</button>' + (t.savedId ? '<button type="button" class="nowrap" data-act="saveCopy">Save as copy</button>' : '') + '</form>' : '<p class="muted">Generate a trip to save it.</p>') +
-      '<div style="margin-top:14px">' + (S.saved.length ? S.saved.map(function (s) {
-        var b = E.budget(s);
-        return '<div class="sugg"><div><b>' + esc(s.name) + (t && t.savedId === s.id ? ' <span class="pill good">open</span>' : '') + '</b><span class="small muted">' + E.dest(s).name + ' · ' + fmtISOLabel(s.params.start) + ' · ' + s.params.days + ' days · ' + money(b.total) + ' of ' + money(b.budget) + ' · ' + s.expenses.length + ' expense(s) · saved ' + new Date(s.savedAt).toLocaleString() + '</span></div>' +
-          '<div class="row nowrap"><button class="sm" data-act="openSaved" data-id="' + s.id + '">Open</button><button class="sm" data-act="dupSaved" data-id="' + s.id + '">Duplicate</button><button class="sm" data-act="renSaved" data-id="' + s.id + '">Rename</button><button class="sm danger" data-act="delSaved" data-id="' + s.id + '">Delete</button></div></div>';
-      }).join('') : '<p class="muted">No saved trips yet.</p>') + '</div></div>' +
-      '<div class="card"><h3>📤 Export &amp; import</h3>' + (t ? '<div class="row">' +
-        '<button data-act="exJSON">Trip (.json)</button><button data-act="exItin">Itinerary (.csv)</button><button data-act="exExp"' + (t.expenses.length ? '' : ' disabled') + '>Expenses (.csv)</button>' +
-        '<button data-act="exText">Download summary (.txt)</button><button data-act="print">🖨 Print / save as PDF</button></div>' +
-        '<div class="field" style="margin-top:14px"><label for="summaryBox">Shareable text summary</label><textarea id="summaryBox" rows="10" readonly>' + esc(summaryText(t)) + '</textarea><div class="row" style="margin-top:8px"><button class="sm" data-act="copyText">Copy to clipboard</button></div></div>' : '<p class="muted">Generate a trip to export it.</p>') +
-      '<div class="field"><label for="importFile">Import a trip (.json exported from this app)</label><input type="file" id="importFile" accept=".json,application/json" data-chg="import"></div></div>' +
-      '<div class="card"><h3>🧹 Reset</h3><p class="muted">Delete all saved trips and the current draft from this browser.</p><button class="danger" data-act="wipe">Delete all data</button></div>';
+      '<div class="page-head"><div><span class="eyebrow dark">My trips</span><h2>Your saved trips</h2></div><span class="pill ' + (persistent ? 'good' : 'warn') + '">' + (persistent ? '✔ Saved in this browser' : '⚠ Session only: export to keep a copy') + '</span></div>' +
+      cur + grid +
+      '<div class="sec-head" style="margin-top:26px"><h3>Export &amp; share</h3></div>' + ex +
+      '<div class="sec-head" style="margin-top:26px"><h3>Import a trip</h3></div>' +
+      '<label class="dropzone" id="drop"><input type="file" id="importFile" accept=".json,application/json" data-chg="import"><span class="di">⬆️</span><b>Drop a trip file here</b><small>or click to browse · .json exported from Wayfinder</small></label>' +
+      '<div class="dangerzone"><button class="ghost danger sm" data-act="wipe">Delete all my data</button></div>';
   }
   function saveCurrent(name, asCopy) {
     var t = S.trip; if (!t) return;
@@ -623,6 +648,18 @@
     commit('Disruption applied. See the alerts below.');
   }
 
+  function importFile(file) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      try {
+        var t = sanitizeImported(JSON.parse(fr.result));
+        S.trip = t; S.form = E.clone(t.params); S.chat = [{ who: 'bot', html: 'Imported <b>' + esc(t.name) + '</b>.' }];
+        persist(); show('itinerary'); toast('Trip imported');
+      } catch (err) { toast(err.message || 'Could not read that file', true); }
+    };
+    fr.onerror = function () { toast('Could not read that file', true); };
+    fr.readAsText(file);
+  }
   var CHG = {
     interest: function (el) {
       var i = S.form.interests, k = el.value, at = i.indexOf(k);
@@ -641,19 +678,7 @@
       S.trip.params.budget = Math.round(v); commit('Budget updated');
     },
     expFilter: function (el) { S.expFilter = el.value; renderExpenses(); },
-    import: function (el) {
-      var file = el.files && el.files[0]; if (!file) return;
-      var fr = new FileReader();
-      fr.onload = function () {
-        try {
-          var t = sanitizeImported(JSON.parse(fr.result));
-          S.trip = t; S.form = E.clone(t.params); S.chat = [{ who: 'bot', html: 'Imported <b>' + esc(t.name) + '</b>.' }];
-          persist(); show('itinerary'); toast('Trip imported');
-        } catch (err) { toast(err.message || 'Could not read that file', true); }
-      };
-      fr.onerror = function () { toast('Could not read that file', true); };
-      fr.readAsText(file);
-    }
+    import: function (el) { var f = el.files && el.files[0]; if (f) importFile(f); }
   };
 
   /* ---------- delegated events ---------- */
@@ -670,6 +695,13 @@
   document.addEventListener('input', function (e) {
     var el = e.target.closest('[data-inp="form"]');
     if (el) { S.form[el.name] = el.value; if (el.name === 'dest') { drawDests(); updateHero(); } if (el.name === 'origin' || el.name === 'style' || el.name === 'dest') drawDetail(); updatePreview(); }
+  });
+  document.addEventListener('dragover', function (e) { var z = e.target.closest('.dropzone'); if (z) { e.preventDefault(); z.classList.add('over'); } });
+  document.addEventListener('dragleave', function (e) { var z = e.target.closest('.dropzone'); if (z) z.classList.remove('over'); });
+  document.addEventListener('drop', function (e) {
+    var z = e.target.closest('.dropzone'); if (!z) return;
+    e.preventDefault(); z.classList.remove('over');
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) importFile(f);
   });
   document.addEventListener('submit', function (e) {
     e.preventDefault();
