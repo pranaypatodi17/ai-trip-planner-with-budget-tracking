@@ -49,9 +49,43 @@
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
       var on = b.dataset.tab === tab; b.classList.toggle('active', on); b.setAttribute('aria-selected', on);
     });
+    $('#hero').hidden = tab !== 'plan';
+    document.body.classList.toggle('home', tab === 'plan');
     render();
     window.scrollTo(0, 0);
+    onScroll();
+    animateIn();
   }
+  /* scroll-in reveals + count-up numbers */
+  var io = null;
+  function animateIn() {
+    var root = $('#tab-' + S.tab), els = root.querySelectorAll('.card, .day, .ctrl, .banner, .dcard, .feature, .stat, .sec-head');
+    Array.prototype.forEach.call(els, function (el, i) { el.classList.add('reveal'); el.style.transitionDelay = Math.min(i % 8, 7) * 55 + 'ms'; });
+    if (!('IntersectionObserver' in window)) { Array.prototype.forEach.call(els, function (el) { el.classList.add('in'); }); runCounts(root); return; }
+    if (io) io.disconnect();
+    io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        en.target.classList.add('in'); io.unobserve(en.target);
+        Array.prototype.forEach.call(en.target.querySelectorAll('[data-count]'), runCount);
+        if (en.target.hasAttribute('data-count')) runCount(en.target);
+      });
+    }, { threshold: 0.12 });
+    Array.prototype.forEach.call(els, function (el) { io.observe(el); });
+  }
+  function runCounts(root) { Array.prototype.forEach.call(root.querySelectorAll('[data-count]'), runCount); }
+  function runCount(el) {
+    if (el.dataset.done) return; el.dataset.done = 1;
+    var to = parseFloat(el.dataset.count), plain = el.dataset.plain, t0 = null;
+    function step(t) {
+      if (t0 === null) t0 = t; var k = Math.min(1, (t - t0) / 900), v = to * (1 - Math.pow(1 - k, 3));
+      el.textContent = plain ? Math.round(v) + (to > 20 && k >= 1 ? '+' : '') : money(v);
+      if (k < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function onScroll() { $('.topbar').classList.toggle('solid', window.scrollY > 40 || S.tab !== 'plan'); }
+  window.addEventListener('scroll', onScroll, { passive: true });
   function render() {
     renderSummary();
     ({ plan: renderPlan, itinerary: renderItinerary, budget: renderBudget, expenses: renderExpenses, live: renderLive, saved: renderSaved })[S.tab]();
@@ -59,7 +93,7 @@
 
   function renderSummary() {
     var el = $('#summary'), t = S.trip;
-    if (!t) { el.hidden = true; return; }
+    if (!t || S.tab === 'plan') { el.hidden = true; return; }
     var b = E.budget(t), sp = E.spent(t);
     el.hidden = false;
     el.innerHTML = '<span><b>' + esc(t.name) + '</b></span>' +
@@ -73,53 +107,85 @@
      PLAN TAB
      ===================================================================== */
   function renderPlan() {
-    var f = S.form, p = $('#tab-plan');
-    p.innerHTML =
-      '<div class="hero"><h1>Plan a trip. Track every dollar.</h1>' +
-      '<p>Pick a destination, set your budget and interests, and the planner builds a day-by-day itinerary with a full cost breakdown. Then edit it, log your expenses, and get live alerts for rain, closures and delays with your plan adjusting automatically.</p>' +
-      '<button class="primary" data-act="demo">▶ Quick start: Paris trip</button>' +
-      (S.trip ? '<button data-act="goto" data-tab="itinerary">Continue current trip →</button>' : '') + '</div>' +
-      '<div class="card"><h3>1 · Choose a destination</h3><div class="dests" id="destPicker"></div></div>' +
+    var f = S.form, ids = Object.keys(D.DESTS);
+    $('#hero').innerHTML =
+      '<div class="hbgs">' + ids.map(function (id) { return '<div class="hbg' + (id === f.dest ? ' on' : '') + '" data-id="' + id + '">' + photo(id) + '</div>'; }).join('') + '</div>' +
+      '<div class="hshade"></div>' +
+      '<div class="hcopy"><span class="eyebrow">AI trip planner</span>' +
+      '<h1>Plan your trip to<br><span class="grad caret" id="rot"></span></h1>' +
+      '<p>Itineraries, budgets and live alerts in one place.</p></div>' +
+      '<form class="searchbar" id="searchForm">' +
+      cell('From', '<select data-inp="form" name="origin">' + options(Object.keys(D.ORIGINS).map(function (k) { return [k, D.ORIGINS[k]]; }), f.origin) + '</select>') +
+      cell('To', '<select data-inp="form" name="dest">' + options(ids.map(function (k) { return [k, D.DESTS[k].name]; }), f.dest) + '</select>') +
+      cell('Start', '<input type="date" data-inp="form" name="start" value="' + esc(f.start) + '">') +
+      cell('Days', '<input type="number" data-inp="form" name="days" min="2" max="10" value="' + esc(f.days) + '">') +
+      cell('Guests', '<input type="number" data-inp="form" name="travelers" min="1" max="8" value="' + esc(f.travelers) + '">') +
+      cell('Budget ($)', '<input type="number" data-inp="form" name="budget" min="100" step="50" value="' + esc(f.budget) + '">') +
+      '<button class="primary go">✨ Plan my trip</button></form>' +
+      '<div id="formErrors" class="herr"></div>' +
+      '<div class="hactions"><button class="ghostw" data-act="demo">▶ Quick start</button>' + (S.trip ? '<button class="ghostw" data-act="goto" data-tab="itinerary">Continue my trip →</button>' : '') + '</div>';
+    typeWord(D.DESTS[f.dest].name);
+
+    $('#tab-plan').innerHTML =
+      '<div class="sec-head"><span class="eyebrow dark">Destinations</span><h2>Where to <span class="grad">next?</span></h2></div>' +
+      '<div class="dests" id="destPicker"></div>' +
       '<div class="card" id="destDetail"></div>' +
-      '<div class="card"><h3>2 · Trip details</h3><div class="form-grid">' +
-      field('Departing from', '<select data-inp="form" name="origin">' + options(Object.keys(D.ORIGINS).map(function (k) { return [k, D.ORIGINS[k]]; }), f.origin) + '</select>') +
-      field('Start date', '<input type="date" data-inp="form" name="start" value="' + esc(f.start) + '">') +
-      field('Days (2–10)', '<input type="number" data-inp="form" name="days" min="2" max="10" value="' + esc(f.days) + '">') +
-      field('Travelers (1–8)', '<input type="number" data-inp="form" name="travelers" min="1" max="8" value="' + esc(f.travelers) + '">') +
-      field('Total budget (USD)', '<input type="number" data-inp="form" name="budget" min="100" step="50" value="' + esc(f.budget) + '">') +
-      field('Travel style', '<select data-inp="form" name="style">' + options(Object.keys(D.STYLES).map(function (k) { return [k, D.STYLES[k].label + ' — ' + D.STYLES[k].note]; }), f.style) + '</select>') +
-      field('Pace', '<select data-inp="form" name="pace">' + options([['relaxed', 'Relaxed (2 activities/day)'], ['balanced', 'Balanced (3/day)'], ['packed', 'Packed (4/day)']], f.pace) + '</select>') +
+      '<div class="card"><div class="row between"><h3 style="margin:0">Make it yours</h3><span class="muted small">Optional</span></div>' +
+      '<div class="form-grid" style="margin-top:12px">' +
+      field('Style', '<select data-inp="form" name="style">' + options(Object.keys(D.STYLES).map(function (k) { return [k, D.STYLES[k].label]; }), f.style) + '</select>') +
+      field('Pace', '<select data-inp="form" name="pace">' + options([['relaxed', 'Relaxed'], ['balanced', 'Balanced'], ['packed', 'Packed']], f.pace) + '</select>') +
       field('Flights', '<select data-inp="form" name="flightClass">' + options(D.FLIGHT_CLASSES.map(function (c) { return [c.id, c.label]; }), f.flightClass) + '</select>') +
-      '</div>' +
-      '<div class="field" style="margin-top:6px"><label>Interests</label><div class="chips" id="interestChips"></div></div>' +
-      '<div id="formErrors" class="err"></div>' +
-      '<div class="row"><button class="primary" data-act="generate">✨ Generate itinerary</button><span class="muted small">Smart planning based on your interests, pace and budget.</span></div></div>' +
-      '<div class="card"><h3>Live estimate</h3><div id="preview" class="preview"></div></div>';
+      '</div><div class="chips" id="interestChips" style="margin-top:4px"></div></div>' +
+      '<div class="card" id="previewCard"><h3>Your estimate</h3><div id="preview" class="preview"></div></div>' +
+      '<div class="features">' +
+      feature('✨', 'Smart itineraries', 'Day-by-day plans built around you.') +
+      feature('💰', 'Budget control', 'Every dollar tracked against your plan.') +
+      feature('🔔', 'Live alerts', 'Rain, closures, delays, handled.') + '</div>' +
+      '<div class="stats">' + stat(Object.keys(D.DESTS).length, 'destinations') + stat(totalAttractions(), 'experiences') + stat(totalHotels(), 'hotels') + stat(5, 'departure cities') + '</div>';
     drawDests(); drawDetail(); drawInterests(); updatePreview();
   }
+  function cell(label, html) { return '<label class="cell"><span>' + label + '</span>' + html + '</label>'; }
+  function feature(icon, title, text) { return '<div class="feature"><div class="ficon">' + icon + '</div><h4>' + title + '</h4><p>' + text + '</p></div>'; }
+  function stat(n, label) { return '<div class="stat"><b data-count="' + n + '" data-plain="1">0</b><span>' + label + '</span></div>'; }
+  function totalAttractions() { return Object.keys(D.DESTS).reduce(function (s, k) { return s + D.DESTS[k].attractions.length; }, 0); }
+  function totalHotels() { return Object.keys(D.DESTS).reduce(function (s, k) { return s + D.DESTS[k].hotels.length; }, 0); }
   function field(label, html) { return '<div class="field"><label>' + label + '</label>' + html + '</div>'; }
+
+  /* typewriter headline + hero background crossfade */
+  var typeTimer;
+  function typeWord(word) {
+    var el = $('#rot'); if (!el) return;
+    clearInterval(typeTimer); var i = 0; el.textContent = '';
+    typeTimer = setInterval(function () { i++; el.textContent = word.slice(0, i); if (i >= word.length) clearInterval(typeTimer); }, 80);
+  }
+  function updateHero() {
+    Array.prototype.forEach.call(document.querySelectorAll('#hero .hbg'), function (b) { b.classList.toggle('on', b.dataset.id === S.form.dest); });
+    typeWord(D.DESTS[S.form.dest].name);
+    var sel = $('#hero [name=dest]'); if (sel) sel.value = S.form.dest;
+  }
+  function fromPerDay(d) {
+    var hs = d.hotels.slice().sort(function (a, b) { return a.nightly - b.nightly; });
+    return Math.round(hs[0].nightly / 2 + D.FOOD_BASE.budget * d.foodF + D.LOCAL_BASE.transit * d.localF.transit);
+  }
   function drawDests() {
     $('#destPicker').innerHTML = Object.keys(D.DESTS).map(function (id) {
       var d = D.DESTS[id];
-      return '<button type="button" class="dest' + (S.form.dest === id ? ' sel' : '') + '" data-act="pickDest" data-id="' + id + '" aria-pressed="' + (S.form.dest === id) + '">' +
-        photo(id) + '<span><b>' + d.name + ', ' + d.country + '</b>' + esc(d.tagline) + '</span></button>';
+      return '<button type="button" class="dcard' + (S.form.dest === id ? ' sel' : '') + '" data-act="pickDest" data-id="' + id + '" aria-pressed="' + (S.form.dest === id) + '">' +
+        photo(id) + '<span class="dshade"></span><span class="dtext"><small>' + esc(d.country) + '</small><b>' + esc(d.name) + '</b>' +
+        '<i>from $' + fromPerDay(d) + ' / day</i></span><span class="dcheck">✓</span></button>';
     }).join('');
   }
   function drawDetail() {
     var el = $('#destDetail'); if (!el) return;
     var d = D.DESTS[S.form.dest], o = S.form.origin, hs = d.hotels.slice().sort(function (a, b) { return a.nightly - b.nightly; });
-    var top = d.attractions.slice().sort(function (a, b) { return b.rating - a.rating; }).slice(0, 5);
-    var c = d.climate, climate = c.hem === 0 ? 'Tropical, warm all year (about ' + c.mean + '°C)' : 'Yearly average about ' + c.mean + '°C, ' + (c.rain >= .3 ? 'fairly rainy' : c.rain >= .2 ? 'occasional rain' : 'mostly dry');
-    var style = S.form.style, food = Math.round(D.FOOD_BASE[style] * d.foodF);
+    var top = d.attractions.slice().sort(function (a, b) { return b.rating - a.rating; }).slice(0, 4);
+    var food = Math.round(D.FOOD_BASE[S.form.style] * d.foodF);
+    el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap');
     el.innerHTML =
-      '<div class="row" style="align-items:flex-start;flex-wrap:nowrap">' + photo(d.id, 'width="260" height="150" style="border-radius:12px;object-fit:cover;flex:none;max-width:40%"') +
-      '<div><h3 style="margin-bottom:2px">' + esc(d.name) + ', ' + esc(d.country) + '</h3><div class="muted">' + esc(d.tagline) + '</div>' +
-      '<div class="chips" style="margin-top:8px"><span class="pill">Best for: ' + esc(d.best) + '</span><span class="pill">' + esc(climate) + '</span></div>' +
-      '<div class="small muted" style="margin-top:8px">Typical costs (' + D.STYLES[style].label.toLowerCase() + ' style): ' + money(food) + ' food/day pp · hotels ' + money(hs[0].nightly) + '–' + money(hs[hs.length - 1].nightly) + '/night · transit ' + money(Math.round(D.LOCAL_BASE.transit * d.localF.transit)) + '/day pp</div></div></div>' +
-      '<div class="grid g3" style="margin-top:14px">' +
-      '<div><h4>✈️ Flights from ' + esc(D.ORIGINS[o]) + '</h4>' + D.FLIGHT_CLASSES.map(function (f) { return '<div class="small"><span class="muted">' + f.label + '</span> <b>' + money(Math.round(d.flights[o] * f.mult)) + '</b> pp</div>'; }).join('') + '</div>' +
-      '<div><h4>⭐ Top attractions</h4>' + top.map(function (a) { return '<div class="small">' + D.CATS[a.cat].icon + ' ' + esc(a.name) + ' <span class="muted">· ' + (a.cost ? money(a.cost) : 'free') + '</span></div>'; }).join('') + '</div>' +
-      '<div><h4>🏨 Hotels</h4>' + hs.map(function (h) { return '<div class="small">' + esc(h.name) + ' <span class="muted">· ' + h.tier + ' · ' + money(h.nightly) + '/night · ★ ' + h.rating + '</span></div>'; }).join('') + '</div></div>';
+      '<div class="detail-head">' + photo(d.id, 'class="dimg"') +
+      '<div><h3>' + esc(d.name) + ' <span class="muted">· ' + esc(d.country) + '</span></h3><div class="muted">' + esc(d.tagline) + '</div>' +
+      '<div class="chips" style="margin-top:10px"><span class="pill">' + esc(d.best) + '</span><span class="pill">🍽 ' + money(food) + '/day</span><span class="pill">🏨 ' + money(hs[0].nightly) + '–' + money(hs[hs.length - 1].nightly) + '</span><span class="pill">✈️ ' + money(Math.round(d.flights[o] * D.FLIGHT_CLASSES[1].mult)) + ' from ' + esc(D.ORIGINS[o]) + '</span></div></div></div>' +
+      '<div class="detail-list"><h4>Top experiences</h4>' + top.map(function (a) { return '<div class="li"><span>' + D.CATS[a.cat].icon + ' ' + esc(a.name) + '</span><b>' + (a.cost ? money(a.cost) : 'Free') + '</b></div>'; }).join('') + '</div>';
   }
   function drawInterests() {
     $('#interestChips').innerHTML = Object.keys(D.CATS).map(function (k) {
@@ -145,10 +211,10 @@
     eb.textContent = '';
     if (r.errors.length) { el.innerHTML = '<span class="muted">Fix the form to see an estimate: ' + r.errors.join(' ') + '</span>'; return; }
     var t = E.create(r.params), b = E.budget(t), L = b.lines, d = D.DESTS[r.params.dest];
-    el.innerHTML = '<div class="row between"><div><div class="big ' + statusClass(b.status) + '">' + money(b.total) + '</div><div class="muted">estimated total for ' + d.name + ' · ' + money(b.perPerson) + ' per person · ' + money(b.perDay) + '/day</div></div>' +
+    el.innerHTML = '<div class="row between"><div><div class="big ' + statusClass(b.status) + '">' + money(b.total) + '</div><div class="muted">' + d.name + ' · ' + money(b.perPerson) + ' per person</div></div>' +
       '<div><span class="pill ' + statusClass(b.status) + '">' + statusLabel(b.status) + '</span> <span class="muted">' + (b.remaining >= 0 ? money(b.remaining) + ' to spare' : money(-b.remaining) + ' over budget') + '</span></div></div>' +
       '<div class="bar big" style="margin:10px 0"><i style="width:' + Math.min(100, b.pct * 100) + '%;background:var(--' + statusClass(b.status) + ')"></i></div>' +
-      '<div class="small muted">Flights ' + money(L.flights) + ' · Lodging ' + money(L.lodging) + ' (' + esc(E.hotelOf(t).name) + ') · Food ' + money(L.food) + ' · Transport ' + money(L.transport) + ' · Activities ' + money(L.activities) + ' · Buffer ' + money(L.buffer) + '</div>';
+      '<div class="chips">' + E.LINE_ORDER.filter(function (l) { return L[l[0]] > 0; }).map(function (l) { return '<span class="pill">' + l[2] + ' ' + money(L[l[0]]) + '</span>'; }).join('') + '</div>';
   }
   function generate(params, label) {
     if (S.trip && !S.trip.savedId && S.trip.expenses.length && !window.confirm('Replace the current trip? It has logged expenses and has not been saved.')) return;
@@ -168,7 +234,7 @@
     var html =
       '<div class="banner">' + photo(p.dest) + '<div class="in"><h2>' + esc(t.name) + '</h2>' +
       '<div>' + esc(d.name) + ', ' + esc(d.country) + ' · ' + fmtISOLabel(p.start) + ' → ' + fmtISOLabel(E.addDays(p.start, p.days - 1)) + '</div>' +
-      '<div class="small" style="margin-top:6px">' + esc(d.tagline) + ' · from ' + esc(D.ORIGINS[p.origin]) + ' · ' + p.travelers + ' traveler' + (p.travelers > 1 ? 's' : '') + '</div>' +
+      '<div class="small" style="margin-top:6px">' + esc(d.tagline) + '</div>' +
       '<div class="row" style="margin-top:12px"><button class="sm" data-act="remix">🔀 Remix itinerary</button><button class="sm" data-act="optimize">🪄 Auto-fit to budget</button><button class="sm" data-act="goto" data-tab="budget">Budget details →</button></div></div></div>' +
       '<div class="grid g2">' +
       '<div class="card why"><h3>🧠 Why this plan</h3><ul>' + why.map(function (l) { return '<li>' + l + '</li>'; }).join('') + '</ul><div class="small muted">' + tips.join(' ') + '</div></div>' +
@@ -262,7 +328,7 @@
       return '<div class="sugg"><div><b>' + esc(s.title) + '</b><span class="small muted">' + esc(s.desc) + '</span></div><div class="row nowrap"><b class="' + (s.delta < 0 ? 'good' : 'warn') + '">' + (s.delta < 0 ? '−' : '+') + money(Math.abs(s.delta)) + '</b><button class="sm" data-act="applySugg" data-id="' + s.id + '">Apply</button></div></div>';
     }
     $('#tab-budget').innerHTML =
-      '<div class="card"><div class="row between" style="align-items:flex-start"><div><div class="muted">Planned total</div><div class="big ' + statusClass(b.status) + '">' + money(b.total) + '</div>' +
+      '<div class="card"><div class="row between" style="align-items:flex-start"><div><div class="muted">Planned total</div><div class="big ' + statusClass(b.status) + '" data-count="' + b.total + '">' + money(b.total) + '</div>' +
       '<span class="pill ' + statusClass(b.status) + '">' + statusLabel(b.status) + '</span> <span class="muted">' + (b.remaining >= 0 ? money(b.remaining) + ' under budget' : money(-b.remaining) + ' over budget') + '</span></div>' +
       '<div style="min-width:200px"><label for="budgetInput">Your budget (USD)</label><input id="budgetInput" type="number" min="100" step="50" value="' + p.budget + '" data-chg="budget"></div></div>' +
       '<div class="bar big" style="margin:14px 0 6px"><i style="width:' + Math.min(100, b.pct * 100) + '%;background:var(--' + statusClass(b.status) + ')"></i></div>' +
@@ -343,16 +409,16 @@
     t.days.forEach(function (d, di) { d.items.forEach(function (it) { var a = E.getAttr(t.params.dest, it.aid); if (!E.isGeneric(a.id)) items.push([a.id, 'Day ' + (di + 1) + ' · ' + a.name]); }); });
     var evs = t.events;
     $('#tab-live').innerHTML =
-      '<div class="card"><h3>📡 Live conditions &amp; alerts</h3><p class="muted">Report a change on your trip and the planner re-plans your itinerary and costs instantly. Every change can be undone.</p>' +
+      '<div class="card"><h3>📡 Live conditions &amp; alerts</h3><p class="muted">Report a change and your plan adapts instantly. Undo any time.</p>' +
       '<div class="wxstrip">' + t.weather.map(function (w, i) { return '<div class="wxday" style="' + (w.forced ? 'border-color:var(--brand)' : '') + '"><div class="ic">' + D.WEATHER[w.type].icon + '</div><b>Day ' + (i + 1) + '</b><div>' + w.temp + '°C</div><div class="muted">' + fmtDay(t, i) + '</div>' + (w.forced ? '<div class="small" style="color:var(--brand)">updated</div>' : '') + '</div>'; }).join('') + '</div></div>' +
       '<div class="grid g3">' +
-      ctrl('🌧️ Heavy rain', 'Outdoor activities on that day are swapped for indoor ones.', '<select id="rainDay">' + dayOptions(t) + '</select>', 'rain', 'Trigger rain') +
-      ctrl('🔥 Heatwave', 'Outdoor stops are moved to cooler hours or replaced with air-conditioned ones.', '<select id="heatDay">' + dayOptions(t) + '</select>', 'heat', 'Trigger heatwave') +
-      ctrl('🚧 Attraction closure', 'A booked attraction closes; every visit is replaced with a similar one.', '<select id="closeAttr">' + (items.length ? options(items) : '<option value="">No attractions planned</option>') + '</select>', 'closure', 'Close attraction', !items.length) +
-      ctrl('🛬 Flight delay', 'Day 1 plans are bumped to your wishlist and extra costs are added.', '<select id="delayHrs">' + options([[2, '2 hours'], [4, '4 hours'], [8, '8 hours'], [14, '14 hours (overnight)']], 4) + '</select>', 'delay', 'Delay flight') +
-      ctrl('🚇 Transit strike', 'Far-away trips are swapped for nearby ones; taxi costs may apply.', '<select id="strikeDay">' + dayOptions(t) + '</select>', 'strike', 'Start strike') +
-      ctrl('🏨 Hotel overbooked', 'Your hotel cancels; the planner rebooks and re-prices the stay.', '<div class="small muted">Current: ' + esc(E.hotelOf(t).name) + '</div>', 'overbook', 'Overbook hotel') +
-      ctrl('🌤️ Refresh forecast', 'Restore one day to the original forecast.', '<select id="clearDay">' + dayOptions(t) + '</select>', 'clearWx', 'Refresh day') +
+      ctrl('🌧️ Heavy rain', 'Swap outdoor plans for indoor ones.', '<select id="rainDay">' + dayOptions(t) + '</select>', 'rain', 'Trigger rain') +
+      ctrl('🔥 Heatwave', 'Move outdoor stops to cooler hours.', '<select id="heatDay">' + dayOptions(t) + '</select>', 'heat', 'Trigger heatwave') +
+      ctrl('🚧 Attraction closure', 'Replace a closed attraction.', '<select id="closeAttr">' + (items.length ? options(items) : '<option value="">No attractions planned</option>') + '</select>', 'closure', 'Close attraction', !items.length) +
+      ctrl('🛬 Flight delay', 'Reshuffle day 1 and add extra costs.', '<select id="delayHrs">' + options([[2, '2 hours'], [4, '4 hours'], [8, '8 hours'], [14, '14 hours (overnight)']], 4) + '</select>', 'delay', 'Delay flight') +
+      ctrl('🚇 Transit strike', 'Swap far trips for nearby ones.', '<select id="strikeDay">' + dayOptions(t) + '</select>', 'strike', 'Start strike') +
+      ctrl('🏨 Hotel overbooked', 'Rebook and re-price your stay.', '<div class="small muted">Current: ' + esc(E.hotelOf(t).name) + '</div>', 'overbook', 'Overbook hotel') +
+      ctrl('🌤️ Refresh forecast', 'Restore the original forecast.', '<select id="clearDay">' + dayOptions(t) + '</select>', 'clearWx', 'Refresh day') +
       '</div>' +
       '<div class="card" style="margin-top:18px"><div class="row between"><h3 style="margin:0">Alerts &amp; actions taken <span class="pill">' + evs.length + '</span></h3><div class="row"><button class="sm" data-act="undoEvent"' + (evs.length ? '' : ' disabled') + '>↩ Undo last</button><button class="sm danger" data-act="clearEvents"' + (evs.length ? '' : ' disabled') + '>Clear log</button></div></div>' +
       (evs.length ? '<ul class="events" style="margin-top:12px">' + evs.map(function (e) {
@@ -407,7 +473,7 @@
     var t = S.trip;
     $('#tab-saved').innerHTML =
       '<div class="card"><h3>💾 Saved trips</h3>' +
-      '<p class="small ' + (Store.isPersistent() ? 'good' : 'warn') + '">' + (Store.isPersistent() ? '✔ Saving to this browser (localStorage). Your trips persist after closing the tab.' : '⚠ localStorage is unavailable here, so trips are kept in memory for this session only. Use Export to keep a copy.') + '</p>' +
+      '<p class="small ' + (Store.isPersistent() ? 'good' : 'warn') + '">' + (Store.isPersistent() ? '✔ Trips are saved in this browser.' : '⚠ localStorage is unavailable here, so trips are kept in memory for this session only. Use Export to keep a copy.') + '</p>' +
       (t ? '<form class="row" id="saveForm" style="flex-wrap:nowrap"><input name="name" value="' + esc(t.name) + '" maxlength="60" aria-label="Trip name"><button class="primary nowrap">' + (t.savedId ? 'Update saved trip' : 'Save trip') + '</button>' + (t.savedId ? '<button type="button" class="nowrap" data-act="saveCopy">Save as copy</button>' : '') + '</form>' : '<p class="muted">Generate a trip to save it.</p>') +
       '<div style="margin-top:14px">' + (S.saved.length ? S.saved.map(function (s) {
         var b = E.budget(s);
@@ -462,7 +528,7 @@
       S.form.style = 'comfort'; S.form.pace = 'balanced'; S.form.interests = ['culture', 'food', 'history'];
       generate(readForm().params, 'Quick-start trip ready');
     },
-    pickDest: function (el) { S.form.dest = el.dataset.id; drawDests(); drawDetail(); updatePreview(); },
+    pickDest: function (el) { S.form.dest = el.dataset.id; drawDests(); drawDetail(); updateHero(); updatePreview(); },
     generate: function () {
       var r = readForm();
       if (r.errors.length) { $('#formErrors').textContent = r.errors.join(' '); toast('Please fix the form', true); return; }
@@ -603,12 +669,13 @@
   });
   document.addEventListener('input', function (e) {
     var el = e.target.closest('[data-inp="form"]');
-    if (el) { S.form[el.name] = el.value; if (el.name === 'origin' || el.name === 'style') drawDetail(); updatePreview(); }
+    if (el) { S.form[el.name] = el.value; if (el.name === 'dest') { drawDests(); updateHero(); } if (el.name === 'origin' || el.name === 'style' || el.name === 'dest') drawDetail(); updatePreview(); }
   });
   document.addEventListener('submit', function (e) {
     e.preventDefault();
     var f = e.target;
-    if (f.id === 'askForm') { var inp = $('#askInput'); ask(inp.value); inp.value = ''; }
+    if (f.id === 'searchForm') ACT.generate();
+    else if (f.id === 'askForm') { var inp = $('#askInput'); ask(inp.value); inp.value = ''; }
     else if (f.id === 'saveForm') saveCurrent(f.name.value, false);
     else if (f.id === 'expForm') {
       var amt = parseFloat(f.amount.value);

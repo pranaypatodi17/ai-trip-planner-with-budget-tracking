@@ -15,22 +15,15 @@
   }
 
   function why(trip) {
-    var p = trip.params, d = E.dest(trip), b = E.budget(trip);
+    var p = trip.params, b = E.budget(trip);
     var acts = activityItems(trip);
     var matched = acts.filter(function (x) { return p.interests.indexOf(x.a.cat) >= 0; });
-    var lines = [];
-    lines.push('Built for <b>' + p.travelers + ' traveler' + (p.travelers > 1 ? 's' : '') + '</b> in <b>' + d.name + '</b>, <b>' + D.STYLES[p.style].label.toLowerCase() + '</b> style with a <b>' + p.pace + '</b> pace (' + D.PACE_SLOTS[p.pace].length + ' activities on a full day).');
-    if (p.interests.length) lines.push(matched.length + ' of ' + acts.length + ' scheduled activities match your interests (' + p.interests.map(function (i) { return D.CATS[i].label.toLowerCase(); }).join(', ') + ').');
-    else lines.push('No interests selected, so I chose the highest-rated attractions.');
-    var rainy = trip.weather.filter(function (w) { return w.type === 'rain'; }).length;
-    var hot = trip.weather.filter(function (w) { return w.type === 'hot'; }).length;
-    if (rainy || hot) lines.push('Weather rules: ' + (rainy ? rainy + ' rainy day' + (rainy > 1 ? 's' : '') + ' got indoor-leaning activities. ' : '') + (hot ? hot + ' hot day' + (hot > 1 ? 's' : '') + ' keep outdoor plans to cooler hours.' : ''));
-    else lines.push('The forecast looks dry, so outdoor highlights are placed on their best days.');
-    lines.push('Day 1 is lighter for arrival and the final day leaves time for departure. Places closed on a given weekday are never scheduled that day.');
-    lines.push(b.status === 'over'
-      ? 'Heads up: the plan is <b>' + money(-b.remaining) + ' over</b> your ' + money(b.budget) + ' budget. See the Budget tab for one-click fixes.'
-      : 'The plan totals <b>' + money(b.total) + '</b>, leaving <b>' + money(b.remaining) + '</b> of your budget.');
-    return lines;
+    var rainy = trip.weather.filter(function (w) { return w.type === 'rain' || w.type === 'hot'; }).length;
+    return [
+      '<b>' + matched.length + ' of ' + acts.length + '</b> stops match your interests.',
+      rainy ? '<b>' + rainy + ' day' + (rainy > 1 ? 's' : '') + '</b> planned around the weather.' : 'Clear forecast: outdoor highlights on the best days.',
+      b.status === 'over' ? '<b>' + money(-b.remaining) + ' over</b> budget. Auto-fit can fix it.' : '<b>' + money(b.remaining) + '</b> left in your budget.'
+    ];
   }
 
   function packing(trip) {
@@ -47,15 +40,7 @@
   }
 
   function tips(trip) {
-    var t = [], b = E.budget(trip), L = b.lines;
-    var biggest = Object.keys(L).sort(function (a, c) { return L[c] - L[a]; })[0];
-    var names = { flights: 'flights', lodging: 'lodging', food: 'food', transport: 'local transport', activities: 'activities', extras: 'disruption costs', buffer: 'contingency' };
-    t.push('Your biggest cost is ' + names[biggest] + ' (' + money(L[biggest]) + ', ' + Math.round(L[biggest] / b.total * 100) + '% of the trip).');
-    var free = activityItems(trip).filter(function (x) { return x.a.cost === 0; }).length;
-    if (free) t.push(free + ' of your activities are free. Great for the budget.');
-    var d = E.dest(trip);
-    t.push('Best for: ' + d.best + '.');
-    return t;
+    return ['Best for ' + E.dest(trip).best + '.'];
   }
 
   function weatherSummary(trip) {
